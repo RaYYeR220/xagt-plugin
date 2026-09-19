@@ -15,7 +15,7 @@ curl --fail --silent --show-error "$API/api/health"
 Expected — `commit` is the 40-character SHA this deployment was built from:
 
 ```json
-{"status":"ok","commit":"0f6515cd94c43b851e0a2aa4f7dc919394755981","service":"regimen","slug":"rayyer-regimen","uptimeSeconds":0}
+{"status":"ok","commit":"<40-character commit>","service":"regimen","slug":"rayyer-regimen","uptimeSeconds":0}
 ```
 
 ## 2. Deployment proof
@@ -25,7 +25,7 @@ curl --fail --silent --show-error "$API/.well-known/xagent-verification.json"
 ```
 
 ```json
-{"schemaVersion":1,"slug":"rayyer-regimen","commit":"0f6515cd94c43b851e0a2aa4f7dc919394755981"}
+{"schemaVersion":1,"slug":"rayyer-regimen","commit":"<the same 40-character commit>"}
 ```
 
 **The two must agree, and they cannot drift.** Neither value is written by hand: both are
@@ -38,7 +38,7 @@ P=$(curl -s "$API/.well-known/xagent-verification.json" | sed -n 's/.*"commit":"
 [ -n "$H" ] && [ "$H" = "$P" ] && echo "MATCH $H" || echo "MISMATCH health=$H proof=$P"
 ```
 
-That commit resolves publicly at `https://github.com/RaYYeR220/regimen/commit/0f6515cd94c43b851e0a2aa4f7dc919394755981`.
+That commit resolves publicly at `https://github.com/RaYYeR220/regimen/commit/<commit>`.
 
 ## 3. The capability — a record that looks good and is not
 

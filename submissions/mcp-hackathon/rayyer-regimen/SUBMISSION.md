@@ -49,6 +49,7 @@ The engine is written against a domain model — a track record, a regime series
 - **Health-check URL:** `https://regimen-nu.vercel.app/api/health`
 - **Deployment proof:** `https://regimen-nu.vercel.app/.well-known/xagent-verification.json`
 - **MCP endpoint:** `https://regimen-nu.vercel.app/mcp` — protocol revision `2026-07-28`
+- **MCP Registry:** published as `io.github.RaYYeR220/regimen` v1.0.0 — `curl https://registry.modelcontextprotocol.io/v0/servers?search=regimen`
 - **API contract:** OpenAPI 3.1 at `https://regimen-nu.vercel.app/api/v1/openapi.json`, generated from the same schemas the routes validate against, so the published contract cannot drift from the enforced one. Source: `source/src/lib/openapi.ts`.
 - **Authentication:** None for the `inline` source — every verification step below runs with no credentials. The `olaxbt-nexus` source takes a caller-supplied key in the `x-nexus-key` header. Keys are read per request, never persisted, never logged; where a key must be identified for rate limiting or cache partitioning only a non-reversible fingerprint is used.
 - **Rate limits / known limits:** Anonymous traffic is limited to 20 requests per minute per source address (in-memory, per instance, best effort — it is a courtesy limit, not a security control). A caller supplying their own Nexus key is not subject to it. A regime map reads at most 45 dates per request, because each date costs five point-in-time upstream reads and the upstream allows 80 a minute; past dates are immutable and cached, so repeating the call widens coverage. Bootstrap resamples are capped at 20,000 and null simulations at 20,000 per request.
@@ -74,10 +75,14 @@ Three resources — `regimen://methodology` (the statistics in full), `regimen:/
 
 The server is stateless as revision `2026-07-28` requires: no `initialize` handshake, no session id, `ttlMs`/`cacheScope` on every cacheable result, and `GET /mcp` answered with `405` so a client can tell it apart from a legacy HTTP+SSE server.
 
+### Web surface
+
+`https://regimen-nu.vercel.app` runs the product rather than describing it: the landing page's figures are produced by a server-side call to this deployment's own `/api/v1/evaluate` and `/api/v1/self-attack` against the published demo curve, so the page cannot quietly disagree with the engine, and if those calls fail it says so instead of showing stale numbers. It carries an interactive panel where a visitor runs an analysis in the browser — including a one-click path to the refusal case, which renders as a deliberate refusal rather than an error. `/methodology` publishes the full statistical method, the same text the `regimen://methodology` MCP resource serves.
+
 ## Source and reproducibility
 
 - **Source repository:** https://github.com/RaYYeR220/regimen
-- **Review commit:** `0f6515cd94c43b851e0a2aa4f7dc919394755981`
+- **Review commit:** `c5c3a0b5f719aed5418c9738fd1002b9d20eef71`
 - **Source submitted in this PR:** `source/` — the complete repository at that commit, including `package.json`, `pnpm-lock.yaml`, the test suites and the evaluation suite. 68 files.
 - **Run locally:** `pnpm install && pnpm dev` → `http://localhost:3000`. No credentials needed for the `inline` source.
 - **Run tests:** `pnpm test` — **409 tests**, of which 370 cover the statistics core. `pnpm typecheck` runs TypeScript in strict mode with `noUncheckedIndexedAccess`.
@@ -119,8 +124,8 @@ The findings are the useful part:
 
 `verification/README.md` in this directory is the full script, runnable with no credentials. In summary:
 
-- **Health-check result:** `GET https://regimen-nu.vercel.app/api/health` → `{"status":"ok","commit":"0f6515cd94c43b851e0a2aa4f7dc919394755981","service":"regimen","slug":"rayyer-regimen","uptimeSeconds":<n>}`
-- **Deployment proof:** `GET https://regimen-nu.vercel.app/.well-known/xagent-verification.json` → `{"schemaVersion":1,"slug":"rayyer-regimen","commit":"0f6515cd94c43b851e0a2aa4f7dc919394755981"}`
+- **Health-check result:** `GET https://regimen-nu.vercel.app/api/health` → `{"status":"ok","commit":"c5c3a0b5f719aed5418c9738fd1002b9d20eef71","service":"regimen","slug":"rayyer-regimen","uptimeSeconds":<n>}`
+- **Deployment proof:** `GET https://regimen-nu.vercel.app/.well-known/xagent-verification.json` → `{"schemaVersion":1,"slug":"rayyer-regimen","commit":"c5c3a0b5f719aed5418c9738fd1002b9d20eef71"}`
 - **Capability call:** `POST /api/v1/evaluate` with the 60-point curve in `verification/README.md` returns `evidence.tier: "weak"` on an annualised Sharpe of 3.72, `probabilisticSharpe: 0.9231`, a 95% interval of `[-0.0332, 0.4624]`, and `periodsShortOfSignificance: 20`. Deterministic; identical on every call.
 - **Expected error behaviour:** a body missing `trackRecord` for the inline source returns `400` with `error.code: "invalid_input"`, `retryable: false`, and `error.details.issues` naming the field path. A Nexus request with no key on a deployment with no demo key returns `401` with `error.code: "missing_credentials"` and a `remedy` naming the header. An unrecognised `Origin` returns `403`. Upstream failures map to `502`/`503`/`504` with `retryable: true`; a well-formed request whose data cannot support an answer returns `422`. The full code vocabulary is in `source/src/lib/errors.ts` and in the OpenAPI document.
 - **The refusal path is the one worth checking.** A three-point curve returns `200` with `evidence.tier: "insufficient_evidence"` and `probabilisticSharpe: null` — no Sharpe ratio at all, because none would mean anything.
@@ -140,4 +145,5 @@ The findings are the useful part:
 - **Team / builder:** Solo builder.
 - **Contact:** GitHub [@RaYYeR220](https://github.com/RaYYeR220) · X [@rayyer_220](https://x.com/rayyer_220)
 - **License / rights:** MIT (`source/LICENSE`). Rights declaration in `RIGHTS.md`.
+- **Discoverability:** the server is listed in the official MCP Registry as `io.github.RaYYeR220/regimen`, so any client that reads the registry can find and connect to it without configuration from us.
 - **Operating commitment:** the deployment is a standard Next.js application on Vercel built straight from the public repository, so it has no cold-sleep behaviour and redeploys on every push. It will stay reachable through the announced review window. Adding a data source is an adapter against the existing interface rather than a change to the engine, which is the intended path for maintaining it.
